@@ -10,7 +10,7 @@ import panda.tutorials.springboot.SpringStudy.service.BankService
 @RequestMapping("/api/banks")
 class BankController(private val service : BankService) {
 
-    // 예외 핸들러
+    // @ExceptionHandler같은 경우는 @Controller, @RestController가 적용된 Bean내에서 발생하는 예외를 잡아서 하나의 메서드에서 처리해주는 기능을 한다.
     @ExceptionHandler(NoSuchElementException::class)
     fun handleNotFound(e : NoSuchElementException) : ResponseEntity<String> =
         ResponseEntity(e.message, HttpStatus.NOT_FOUND)

@@ -26,6 +26,10 @@ internal class BankControllerTest {
 
     val baseUrl = "/api/banks"
 
+
+    // 메소드 단위로 테스트하면 유닛 테스트하기 딱좋다 ( 테스트 간의 영향이 없기 떄문 )
+    // @TestInstance는 메소드끼리 영향을 주는 테스트가 가능함.
+
     @Nested
     @DisplayName("getBanks()")
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -72,14 +76,12 @@ internal class BankControllerTest {
             // given
             val accountNumber = "does_not_exist"
 
-            // when
+            // when/then
             mockMvc.get("$baseUrl/$accountNumber")
                 .andDo { print() }
                 .andExpect {
                     status { isNotFound() }
                 }
-
-            // then
         }
 
     }
