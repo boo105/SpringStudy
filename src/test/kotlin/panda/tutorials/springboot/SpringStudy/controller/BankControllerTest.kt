@@ -10,9 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
-import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.get
-import org.springframework.test.web.servlet.post
+import org.springframework.test.annotation.DirtiesContext
+import org.springframework.test.web.servlet.*
 import panda.tutorials.springboot.SpringStudy.model.Bank
 
 // 우리는 Controller를 테스트 할거기 때문에 당연히 스트링부트 실행환경을 구축해야한다.
@@ -35,6 +34,49 @@ internal class BankControllerTest @Autowired constructor(
 
     // 메소드 단위로 테스트하면 유닛 테스트하기 딱좋다 ( 테스트 간의 영향이 없기 떄문 )
     // @TestInstance는 메소드끼리 영향을 주는 테스트가 가능함.
+
+    /*
+    * Spring test에서 같은 context를 사용하는 테스트(같은 context.xml 파일을 이용해서 생성되거나,
+    * 같은 SpringBootApplication 이용)가 여러 개 있을 때 각각의 테스트마다 새로운 context를 생성하는게 아니라
+    * 기존의 context를 재활용하기 때문에 발생하는 문제였다
+    * -> 따라서 그냥 단순히 inner class test로 테스트를 하게 되면 독립적인 테스트 환경을 구성을 못함.
+    * */
+
+    @Nested
+    @DisplayName("DELETE /api/banks/{accountNumber}")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    inner class DeleteExistingBank {
+        /* @DirtiesContext는 어노테이션을 통해 테스트를 수행하기 전, 수행한 이후,
+        그리고 테스트의 각 테스트 케이스마다 수행하기 전, 수행한 이후에 context를 다시 생성하도록 지시할 수 있다.
+        메소드 뿐만 아니라 클래스 레밸도 적용가능.
+        * */
+        @Test
+        @DirtiesContext
+        fun `should delete the bank with the given account number`() {
+            //given
+            val accountNumber = 123456
+            //when
+            mockMvc.delete("$baseUrl/$accountNumber")
+                .andDo { print() }
+                .andExpect { status { isNoContent() } }
+
+            //then
+
+            mockMvc.get("$baseUrl/$accountNumber")
+                .andExpect { status { isNotFound()  } }
+        }
+
+        @Test
+        fun `should return NOT FOUND if no bank with given account number exists`() {
+            //given
+            val invalidAccountNumber = "does_not_exist"
+            //when
+            mockMvc.delete("$baseUrl/$invalidAccountNumber")
+                .andDo { print() }
+                .andExpect { status { isNotFound() } }
+            //then
+        }
+    }
 
     @Nested
     @DisplayName("GET /api/banks")
@@ -111,9 +153,82 @@ internal class BankControllerTest @Autowired constructor(
             performPost
                 .andDo { print() }
                 .andExpect {
-                     status { isCreated() }
+                    status { isCreated() }
+                    content {
+                        contentType(MediaType.APPLICATION_JSON)
+                        json(objectMapper.writeValueAsString(newBank))
+                    }
+//                    jsonPath("$.accountNumber") { value("acc123") }
+//                    jsonPath("$.trust") { value("31.415") }
+//                    jsonPath("$.transactionFee") { value("2") }
+                }
+
+            mockMvc.get("$baseUrl/${newBank.accountNumber}")
+                .andExpect { content { json(objectMapper.writeValueAsString(newBank)) } }
+        }
+        
+        @Test
+        fun `should return BAD REQUEST if bank with given account number already exists`() {
+            //given
+            val invalidBank = Bank("123456", 1.0, 1)
+            
+            //when
+            val performPost = mockMvc.post(baseUrl) {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(invalidBank)
+            }
+            
+            //then
+            performPost.andDo { print() }
+                .andExpect {
+                    status {  isBadRequest() }
                 }
         }
     }
+    
+    @Nested
+    @DisplayName("PATCH /api/banks")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    inner class PatchExistingBank {
+        @Test
+        fun `should update an existing bank`() {
+            //given
+            val updateBank = Bank("123456", 1.0, 1)
+            //when
+            val performPatchRequest = mockMvc.patch(baseUrl) {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(updateBank)
+            }
 
+            //then
+            performPatchRequest.andDo { print() }
+                .andExpect {
+                    status { isOk() }
+                    content {
+                        contentType(MediaType.APPLICATION_JSON)
+                        json(objectMapper.writeValueAsString(updateBank))
+                    }
+                }
+
+            mockMvc.get("$baseUrl/${updateBank.accountNumber}")
+                .andExpect { content { json(objectMapper.writeValueAsString(updateBank)) } }
+        }
+        
+        @Test
+        fun `should return NOT FOUND if no bank with given account number exists`() {
+            //given
+            val invalidBank = Bank("does_not_exist", 1.0, 1)
+            //when
+            val performPatchRequest = mockMvc.patch(baseUrl) {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(invalidBank)
+            }
+
+            performPatchRequest.andDo { print() }
+                .andExpect {
+                    status { isNotFound() }
+                }
+            //then 
+        }
+    }
 }
