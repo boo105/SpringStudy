@@ -1,5 +1,6 @@
 package panda.tutorials.springboot.SpringStudy.controller
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -11,18 +12,23 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
+import panda.tutorials.springboot.SpringStudy.model.Bank
 
 // 우리는 Controller를 테스트 할거기 때문에 당연히 스트링부트 실행환경을 구축해야한다.
 // @SpringBootTest : 어노테이션을 통해 애플리케이션 테스트에 필요한 거의 모든 의존성들을 제공해준다.
 // @AutoConfigureMockMvc : MockMvc를 생성한다.
 @SpringBootTest   // 이거 하면 스프링부트 자체를 실행해 테스트 환경 만드는듯?
 @AutoConfigureMockMvc // MockMvc 쓰려면 필요함.
-internal class BankControllerTest {
+internal class BankControllerTest @Autowired constructor(
+    val mockMvc: MockMvc,
+    val objectMapper: ObjectMapper
+) {
 
     // @Autowired : 필요한 의존 객체의 “타입"에 해당하는 IoC 컨테이너 안에 존재하는 Bean을 찾아 주입한다.
     // 추후 더 알아보자
-    @Autowired
-    lateinit var mockMvc : MockMvc
+    // @Autowired
+    //lateinit var mockMvc : MockMvc
 
     val baseUrl = "/api/banks"
 
@@ -31,7 +37,7 @@ internal class BankControllerTest {
     // @TestInstance는 메소드끼리 영향을 주는 테스트가 가능함.
 
     @Nested
-    @DisplayName("getBanks()")
+    @DisplayName("GET /api/banks")
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     inner class GetBanks {
         @Test
@@ -52,7 +58,7 @@ internal class BankControllerTest {
     }
 
     @Nested
-    @DisplayName("getBank()")
+    @DisplayName("GET /api/banks/{accountNumber}")
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     inner class GetBank {
         @Test
@@ -84,6 +90,30 @@ internal class BankControllerTest {
                 }
         }
 
+    }
+
+    @Nested
+    @DisplayName("POST /api/banks")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    inner class PostNewBank {
+        @Test
+        fun `should add the new bank`() {
+            //given
+            val newBank = Bank("acc123", 31.415, 2)
+            
+            //when
+            val performPost = mockMvc.post(baseUrl) {
+                contentType = MediaType.APPLICATION_JSON
+                content = objectMapper.writeValueAsString(newBank)
+            }
+
+            // then
+            performPost
+                .andDo { print() }
+                .andExpect {
+                     status { isCreated() }
+                }
+        }
     }
 
 }
